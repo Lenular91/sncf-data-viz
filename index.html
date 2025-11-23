@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SNCF Data - Open Data (GitHub Version)</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Roboto', sans-serif; display: flex; height: 100vh; overflow: hidden; background-color: #ecf0f1; }
+        #sidebar { width: 350px; flex-shrink: 0; background: white; padding: 20px; box-shadow: 2px 0 10px rgba(0,0,0,0.1); display: flex; flex-direction: column; overflow-y: auto; z-index: 1000; }
+        #map-container { flex: 1; position: relative; }
+        #map { height: 100%; width: 100%; }
+        h1 { color: #2c3e50; font-size: 1.4rem; margin-top: 0; border-bottom: 2px solid #0088ce; padding-bottom: 10px; }
+        h2 { color: #0088ce; font-size: 1.1rem; margin-top: 20px; }
+        h3 { font-size: 0.9rem; color: #7f8c8d; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 1px; }
+        .search-box { width: 100%; padding: 10px; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 5px; font-size: 1rem; box-sizing: border-box; }
+        .card { background: #f8f9fa; border-radius: 6px; padding: 15px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .stat-big { font-size: 1.5rem; font-weight: bold; color: #2c3e50; }
+        .stat-desc { font-size: 0.8rem; color: #7f8c8d; }
+        .top-list { list-style: none; padding: 0; margin: 0; }
+        .top-list li { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 0.9rem; cursor: pointer; }
+        .top-list li:hover { color: #0088ce; }
+        .top-list span.count { font-weight: bold; color: #555; }
+        .chart-wrapper { position: relative; height: 200px; width: 100%; margin-bottom: 20px; }
+        #loader { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: #0088ce; color: white; padding: 10px 20px; border-radius: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); z-index: 2000; font-weight: bold; display: none; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+        #details-panel { display: none; border-top: 2px dashed #ddd; margin-top: 20px; padding-top: 10px; }
+        .close-btn { float: right; cursor: pointer; color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div id="loader">Chargement du fichier gares.json...</div>
+
+    <div id="sidebar">
+        <h1>🚄 SNCF Analytics</h1>
+        <input type="text" id="search" class="search-box" placeholder="Rechercher une gare..." onkeyup="filterStations()">
+
+        <div id="global-stats">
+            <h3>Vue d'ensemble</h3>
+            <div class="card">
+                <div class="stat-big" id="total-stations">0</div>
+                <div class="stat-desc">Gares référencées</div>
+            </div>
+            <h3>Répartition par Région</h3>
+            <div class="chart-wrapper"><canvas id="regionChart"></canvas></div>
+            <h3>Top 5 Trafic (2023)</h3>
+            <ul class="top-list" id="top-stations-list"></ul>
+        </div>
+
+        <div id="details-panel">
+            <span class="close-btn" onclick="closeDetails()">x</span>
+            <h2 id="st-name">Nom</h2>
+            <p id="st-geo" style="color:#666; font-size:0.9rem;"></p>
+            <h3>Évolution Fréquentation</h3>
+            <div class="chart-wrapper"><canvas id="evolutionChart"></canvas></div>
+        </div>
+    </div>
+
+    <div id="map-container"><div id="map"></div></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        let map, markersCluster;
+        let processedData = {}; // Notre "base de données" locale optimisée
+        let evolutionChartInstance = null;
+
+        function initMap() {
+            map = L.map('map').setView([46.603354, 1.888334], 6);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '© CARTO' }).addTo(map);
+            markersCluster = L.markerClusterGroup({ maxClusterRadius: 50 });
+            map.addLayer(markersCluster);
+            
+            loadLocalJson();
+        }
+
+        async function loadLocalJson() {
+            document.getElementById('loader').style.display = 'block';
+            try {
+                // 1. CHARGEMENT DU FICHIER JSON LOCAL
+                const response = await fetch('gares.json');
+                if (!response.ok) throw new Error("Impossible de trouver gares.json");
+                const json = await response.json();
+                
+                // 2. TRAITEMENT DES DONNÉES (Transformation en objets utilisables)
+                // Le format SPARQL JSON est verbeux, on va le simplifier
+                processGraphDBData(json.results.bindings);
+                
+                // 3. AFFICHAGE
+                renderMap();
+                renderStats();
+                renderTop5();
+
+                document.getElementById('total-stations').innerText = Object.keys(processedData).length;
+
+            } catch (error) {
+                console.error(error);
+                alert("Erreur : " + error.message + "\n\nAssurez-vous que 'gares.json' est bien dans le même dossier !");
+            } finally {
+                document.getElementById('loader').style.display = 'none';
+            }
+        }
+
+        // Cette fonction transforme la liste plate en objets structurés
+        function processGraphDBData(bindings) {
+            bindings.forEach(row => {
+                const nom = row.nom.value;
+                const annee = row.annee.value;
+                const nombre = parseInt(row.nombre.value);
+                
+                // Si la gare n'existe pas encore dans notre objet, on l'initialise
+                if (!processedData[nom]) {
+                    processedData[nom] = {
+                        nom: nom,
+                        lat: parseFloat(row.lat.value),
+                        long: parseFloat(row.long.value),
+                        region: row.region.value,
+                        dept: row.dept.value,
+                        history: {}
+                    };
+                }
+                // On ajoute l'année
+                processedData[nom].history[annee] = nombre;
+            });
+        }
+
+        function renderMap() {
+            markersCluster.clearLayers();
+            Object.values(processedData).forEach(gare => {
+                const marker = L.marker([gare.lat, gare.long]);
+                marker.bindPopup(`<b>${gare.nom}</b><br>${gare.region}`);
+                marker.on('click', () => displayDetails(gare));
+                markersCluster.addLayer(marker);
+            });
+        }
+
+        function renderStats() {
+            // Calcul des totaux par région pour 2023
+            const regionCounts = {};
+            Object.values(processedData).forEach(gare => {
+                const val2023 = gare.history['2023'] || 0;
+                if (val2023 > 0) {
+                    regionCounts[gare.region] = (regionCounts[gare.region] || 0) + val2023;
+                }
+            });
+
+            // Préparation Chart.js
+            const ctx = document.getElementById('regionChart').getContext('2d');
+            const colors = ['#3498db', '#e74c3c', '#2ecc71', '#f1c40f', '#9b59b6', '#34495e', '#16a085', '#d35400'];
+            
+            // Tri décroissant
+            const sortedRegions = Object.entries(regionCounts).sort((a,b) => b[1] - a[1]);
+
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: sortedRegions.map(x => x[0]),
+                    datasets: [{
+                        data: sortedRegions.map(x => x[1]),
+                        backgroundColor: colors,
+                        borderWidth: 0
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+        }
+
+        function renderTop5() {
+            // Convertir en tableau et trier par valeur 2023
+            const sortedStations = Object.values(processedData)
+                .sort((a, b) => (b.history['2023'] || 0) - (a.history['2023'] || 0))
+                .slice(0, 5);
+
+            const list = document.getElementById('top-stations-list');
+            list.innerHTML = "";
+            sortedStations.forEach(s => {
+                const li = document.createElement('li');
+                li.innerHTML = `<span>${s.nom}</span> <span class="count">${(s.history['2023'] || 0).toLocaleString()}</span>`;
+                li.onclick = () => {
+                    // Zoom et affichage détails
+                    map.setView([s.lat, s.long], 14);
+                    displayDetails(s);
+                };
+                list.appendChild(li);
+            });
+        }
+
+        function displayDetails(gare) {
+            document.getElementById('global-stats').style.display = 'none';
+            document.getElementById('details-panel').style.display = 'block';
+            document.getElementById('st-name').innerText = gare.nom;
+            document.getElementById('st-geo').innerText = `${gare.dept} - ${gare.region}`;
+
+            // Préparation données graphique
+            const years = Object.keys(gare.history).sort();
+            const values = years.map(y => gare.history[y]);
+
+            const ctx = document.getElementById('evolutionChart').getContext('2d');
+            if (evolutionChartInstance) evolutionChartInstance.destroy();
+
+            evolutionChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: years,
+                    datasets: [{ label: 'Voyageurs', data: values, backgroundColor: '#0088ce' }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        function closeDetails() {
+            document.getElementById('details-panel').style.display = 'none';
+            document.getElementById('global-stats').style.display = 'block';
+            map.setView([46.603354, 1.888334], 6); // Reset zoom
+        }
+
+        function filterStations() {
+            const input = document.getElementById('search').value.toLowerCase();
+            if(input.length < 3) return;
+            
+            const found = Object.values(processedData).find(s => s.nom.toLowerCase().includes(input));
+            if (found) {
+                map.setView([found.lat, found.long], 14);
+                displayDetails(found);
+            }
+        }
+
+        initMap();
+    </script>
+</body>
+</html>
