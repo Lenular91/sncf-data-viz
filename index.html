@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SNCF Data - Open Data (GitHub Version)</title>
+    <title>SNCF Data - Dashboard Hybride</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
@@ -27,18 +27,44 @@
         .top-list li:hover { color: #0088ce; }
         .top-list span.count { font-weight: bold; color: #555; }
         .chart-wrapper { position: relative; height: 200px; width: 100%; margin-bottom: 20px; }
+        
         #loader { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: #0088ce; color: white; padding: 10px 20px; border-radius: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); z-index: 2000; font-weight: bold; display: none; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+        
         #details-panel { display: none; border-top: 2px dashed #ddd; margin-top: 20px; padding-top: 10px; }
         .close-btn { float: right; cursor: pointer; color: red; font-weight: bold; }
+
+        /* --- STYLE DU BOUTON SWITCH --- */
+        .mode-container {
+            background: #eee; padding: 10px; border-radius: 8px; margin-bottom: 20px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .mode-label { font-size: 0.9rem; font-weight: bold; color: #555; }
+        .switch-btn {
+            padding: 5px 15px; border: none; border-radius: 20px; cursor: pointer;
+            font-weight: bold; font-size: 0.8rem; transition: all 0.3s;
+        }
+        /* Mode JSON (Gris) */
+        .btn-json { background-color: #95a5a6; color: white; }
+        /* Mode LIVE (Vert) */
+        .btn-live { background-color: #27ae60; color: white; box-shadow: 0 0 8px #27ae60; }
+
     </style>
 </head>
 <body>
 
-    <div id="loader">Chargement du fichier gares.json...</div>
+    <div id="loader">Chargement...</div>
 
     <div id="sidebar">
         <h1>🚄 SNCF Analytics</h1>
+
+        <div class="mode-container">
+            <span class="mode-label">Source des données :</span>
+            <button id="modeBtn" class="switch-btn btn-json" onclick="toggleMode()">
+                📂 Fichier JSON
+            </button>
+        </div>
+
         <input type="text" id="search" class="search-box" placeholder="Rechercher une gare..." onkeyup="filterStations()">
 
         <div id="global-stats">
@@ -70,8 +96,13 @@
 
     <script>
         let map, markersCluster;
-        let processedData = {}; // Notre "base de données" locale optimisée
+        let processedData = {}; 
         let evolutionChartInstance = null;
+        let regionChartInstance = null;
+
+        // --- ETAT INITIAL ---
+        let USE_LIVE_SPARQL = false; // On commence par le fichier JSON (plus sûr)
+        const SPARQL_ENDPOINT = "http://localhost:7200/repositories/Gares_Frequentation_RCW"; 
 
         function initMap() {
             map = L.map('map').setView([46.603354, 1.888334], 6);
@@ -79,44 +110,123 @@
             markersCluster = L.markerClusterGroup({ maxClusterRadius: 50 });
             map.addLayer(markersCluster);
             
-            loadLocalJson();
+            loadDashboardData();
         }
 
-        async function loadLocalJson() {
-            document.getElementById('loader').style.display = 'block';
+        // --- FONCTION QUI GÈRE LE SWITCH ---
+        function toggleMode() {
+            // 1. Inverser le mode
+            USE_LIVE_SPARQL = !USE_LIVE_SPARQL;
+
+            // 2. Mettre à jour le bouton (visuel)
+            const btn = document.getElementById('modeBtn');
+            if (USE_LIVE_SPARQL) {
+                btn.innerText = "⚡ SPARQL Live";
+                btn.className = "switch-btn btn-live";
+            } else {
+                btn.innerText = "📂 Fichier JSON";
+                btn.className = "switch-btn btn-json";
+            }
+
+            // 3. Recharger les données
+            loadDashboardData();
+        }
+
+        async function loadDashboardData() {
+            const loader = document.getElementById('loader');
+            loader.style.display = 'block';
+            
+            // Si on est en mode Live, on change le texte du loader pour faire pro
+            loader.innerText = USE_LIVE_SPARQL ? "Connexion à GraphDB..." : "Lecture gares.json...";
+
+            // RESET COMPLET DES DONNEES
+            processedData = {}; 
+            markersCluster.clearLayers();
+            document.getElementById('total-stations').innerText = "0";
+            document.getElementById('top-stations-list').innerHTML = "";
+            if(regionChartInstance) regionChartInstance.destroy();
+
             try {
-                // 1. CHARGEMENT DU FICHIER JSON LOCAL
-                const response = await fetch('gares.json');
-                if (!response.ok) throw new Error("Impossible de trouver gares.json");
-                const json = await response.json();
+                let rawBindings = [];
+
+                if (USE_LIVE_SPARQL) {
+                    // --- MODE LIVE ---
+                    console.log("Tentative de connexion SPARQL...");
+                    const query = `
+                        PREFIX sncf: <http://data.sncf.fr/frequentation-gares/>
+                        PREFIX schema1: <http://schema.org/>
+                        SELECT ?nom ?region ?dept ?lat ?long ?annee ?nombre WHERE {
+                            ?gare a sncf:Gare ; sncf:Nom_de_la_gare ?nom ;
+                                  sncf:region ?region ; sncf:departement ?dept ;
+                                  schema1:latitude ?lat ; schema1:longitude ?long .
+                            ?gare ?p ?nombre .
+                            FILTER(CONTAINS(STR(?p), "Total_Voyageurs_"))
+                            BIND(STRAFTER(STR(?p), "Total_Voyageurs_") AS ?annee)
+                            FILTER(REGEX(?annee, "^[0-9]{4}$"))
+                        }
+                    `;
+                    rawBindings = await runSparql(query);
                 
-                // 2. TRAITEMENT DES DONNÉES (Transformation en objets utilisables)
-                // Le format SPARQL JSON est verbeux, on va le simplifier
-                processGraphDBData(json.results.bindings);
+                } else {
+                    // --- MODE JSON ---
+                    console.log("Chargement JSON statique...");
+                    const response = await fetch('gares.json');
+                    if (!response.ok) throw new Error("Fichier gares.json introuvable");
+                    const json = await response.json();
+                    rawBindings = json.results.bindings;
+                }
                 
-                // 3. AFFICHAGE
+                // Traitement et Affichage
+                processGraphDBData(rawBindings);
                 renderMap();
                 renderStats();
                 renderTop5();
-
                 document.getElementById('total-stations').innerText = Object.keys(processedData).length;
 
             } catch (error) {
                 console.error(error);
-                alert("Erreur : " + error.message + "\n\nAssurez-vous que 'gares.json' est bien dans le même dossier !");
+                let msg = error.message;
+                
+                if(USE_LIVE_SPARQL) {
+                    alert("ERREUR DE CONNEXION GRAPHDB !\n\n1. Vérifiez que GraphDB tourne sur le port 7200.\n2. Vérifiez que CORS est activé.\n\n-> Retour automatique au mode JSON.");
+                    // En cas d'échec du live, on repasse en JSON automatiquement
+                    toggleMode(); 
+                    return; // On arrête pour ne pas boucler
+                } else {
+                    alert("Erreur JSON : " + msg);
+                }
             } finally {
-                document.getElementById('loader').style.display = 'none';
+                loader.style.display = 'none';
             }
         }
 
-        // Cette fonction transforme la liste plate en objets structurés
+        async function runSparql(query) {
+            // Ajout d'un timeout pour ne pas attendre 100 ans si GraphDB est éteint
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 secondes max
+
+            const url = SPARQL_ENDPOINT + "?query=" + encodeURIComponent(query);
+            
+            try {
+                const response = await fetch(url, { 
+                    headers: { 'Accept': 'application/sparql-results+json' },
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                if (!response.ok) throw new Error("Erreur HTTP GraphDB: " + response.status);
+                const json = await response.json();
+                return json.results.bindings;
+            } catch (err) {
+                throw err;
+            }
+        }
+
         function processGraphDBData(bindings) {
             bindings.forEach(row => {
                 const nom = row.nom.value;
                 const annee = row.annee.value;
                 const nombre = parseInt(row.nombre.value);
                 
-                // Si la gare n'existe pas encore dans notre objet, on l'initialise
                 if (!processedData[nom]) {
                     processedData[nom] = {
                         nom: nom,
@@ -127,7 +237,6 @@
                         history: {}
                     };
                 }
-                // On ajoute l'année
                 processedData[nom].history[annee] = nombre;
             });
         }
@@ -143,38 +252,29 @@
         }
 
         function renderStats() {
-            // Calcul des totaux par région pour 2023
             const regionCounts = {};
             Object.values(processedData).forEach(gare => {
                 const val2023 = gare.history['2023'] || 0;
-                if (val2023 > 0) {
-                    regionCounts[gare.region] = (regionCounts[gare.region] || 0) + val2023;
-                }
+                if (val2023 > 0) regionCounts[gare.region] = (regionCounts[gare.region] || 0) + val2023;
             });
 
-            // Préparation Chart.js
             const ctx = document.getElementById('regionChart').getContext('2d');
             const colors = ['#3498db', '#e74c3c', '#2ecc71', '#f1c40f', '#9b59b6', '#34495e', '#16a085', '#d35400'];
-            
-            // Tri décroissant
             const sortedRegions = Object.entries(regionCounts).sort((a,b) => b[1] - a[1]);
 
-            new Chart(ctx, {
+            if(regionChartInstance) regionChartInstance.destroy(); // Important pour éviter superposition
+
+            regionChartInstance = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
                     labels: sortedRegions.map(x => x[0]),
-                    datasets: [{
-                        data: sortedRegions.map(x => x[1]),
-                        backgroundColor: colors,
-                        borderWidth: 0
-                    }]
+                    datasets: [{ data: sortedRegions.map(x => x[1]), backgroundColor: colors, borderWidth: 0 }]
                 },
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
             });
         }
 
         function renderTop5() {
-            // Convertir en tableau et trier par valeur 2023
             const sortedStations = Object.values(processedData)
                 .sort((a, b) => (b.history['2023'] || 0) - (a.history['2023'] || 0))
                 .slice(0, 5);
@@ -184,11 +284,7 @@
             sortedStations.forEach(s => {
                 const li = document.createElement('li');
                 li.innerHTML = `<span>${s.nom}</span> <span class="count">${(s.history['2023'] || 0).toLocaleString()}</span>`;
-                li.onclick = () => {
-                    // Zoom et affichage détails
-                    map.setView([s.lat, s.long], 14);
-                    displayDetails(s);
-                };
+                li.onclick = () => { map.setView([s.lat, s.long], 14); displayDetails(s); };
                 list.appendChild(li);
             });
         }
@@ -199,7 +295,6 @@
             document.getElementById('st-name').innerText = gare.nom;
             document.getElementById('st-geo').innerText = `${gare.dept} - ${gare.region}`;
 
-            // Préparation données graphique
             const years = Object.keys(gare.history).sort();
             const values = years.map(y => gare.history[y]);
 
@@ -208,10 +303,7 @@
 
             evolutionChartInstance = new Chart(ctx, {
                 type: 'bar',
-                data: {
-                    labels: years,
-                    datasets: [{ label: 'Voyageurs', data: values, backgroundColor: '#0088ce' }]
-                },
+                data: { labels: years, datasets: [{ label: 'Voyageurs', data: values, backgroundColor: '#0088ce' }] },
                 options: { responsive: true, maintainAspectRatio: false }
             });
         }
@@ -219,18 +311,14 @@
         function closeDetails() {
             document.getElementById('details-panel').style.display = 'none';
             document.getElementById('global-stats').style.display = 'block';
-            map.setView([46.603354, 1.888334], 6); // Reset zoom
+            map.setView([46.603354, 1.888334], 6); 
         }
 
         function filterStations() {
             const input = document.getElementById('search').value.toLowerCase();
             if(input.length < 3) return;
-            
             const found = Object.values(processedData).find(s => s.nom.toLowerCase().includes(input));
-            if (found) {
-                map.setView([found.lat, found.long], 14);
-                displayDetails(found);
-            }
+            if (found) { map.setView([found.lat, found.long], 14); displayDetails(found); }
         }
 
         initMap();
