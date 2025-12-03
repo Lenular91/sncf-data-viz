@@ -4,56 +4,91 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SNCF Data - Dashboard Hybride & Multimédia</title>
+    <title>SNCF Analytics - Dashboard</title>
 
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-    <div id="loader">Chargement...</div>
+    <div id="loader">Chargement des données...</div>
 
     <div id="sidebar">
         <h1>🚄 SNCF Analytics</h1>
 
-        <div class="mode-container">
-            <span class="mode-label">Source des données :</span>
-            <button id="modeBtn" class="switch-btn btn-json" onclick="toggleMode()">
-                📂 Fichier JSON
+        <div class="actions-row">
+            <button id="modeBtn" class="btn btn-secondary" onclick="toggleMode()">
+                📂 JSON
+            </button>
+            <button id="themeBtn" class="btn btn-secondary" onclick="toggleTheme()">
+                🌙 Dark
             </button>
         </div>
 
-        <input type="text" id="search" class="search-box" placeholder="Rechercher une gare..."
-            onkeyup="filterStations()">
+        <div class="controls-container">
+            <input type="text" id="search" class="search-box" placeholder="🔍 Rechercher une gare..."
+                onkeyup="filterStations()">
+
+            <select id="regionFilter" class="filter-select" onchange="filterStations()">
+                <option value="">🌍 Toutes les régions</option>
+            </select>
+        </div>
 
         <div id="global-stats">
             <h3>Vue d'ensemble</h3>
             <div class="card">
                 <div class="stat-big" id="total-stations">0</div>
-                <div class="stat-desc">Gares référencées</div>
+                <div class="stat-desc">Gares affichées</div>
             </div>
+
             <h3>Répartition par Région</h3>
-            <div class="chart-wrapper"><canvas id="regionChart"></canvas></div>
-            <h3>Top 5 Trafic (2023)</h3>
-            <ul class="top-list" id="top-stations-list"></ul>
+            <div class="card">
+                <div class="chart-wrapper"><canvas id="regionChart"></canvas></div>
+            </div>
+
+            <h3>🏆 Top Trafic</h3>
+            <div class="card" style="padding: 10px;">
+                <div class="top-controls">
+                    <select id="topYearFilter" class="filter-select" onchange="renderTop5()">
+                    </select>
+                    <select id="topCountFilter" class="filter-select" onchange="renderTop5()">
+                        <option value="1">Top 1</option>
+                        <option value="2">Top 2</option>
+                        <option value="3">Top 3</option>
+                        <option value="4">Top 4</option>
+                        <option value="5">Top 5</option>
+                        <option value="6">Top 6</option>
+                        <option value="7">Top 7</option>
+                        <option value="8">Top 8</option>
+                        <option value="9">Top 9</option>
+                        <option value="10">Top 10</option>
+                    </select>
+                </div>
+                <ul class="top-list" id="top-stations-list"></ul>
+            </div>
         </div>
 
         <div id="details-panel">
-            <span class="close-btn" onclick="closeDetails()">x</span>
-            <h2 id="st-name">Nom</h2>
-            <p id="st-geo" style="color:#666; font-size:0.9rem; margin-bottom: 10px;"></p>
+            <span class="close-btn" onclick="closeDetails()">×</span>
+            <h2 id="st-name">Nom de la gare</h2>
+            <p id="st-geo" style="color: var(--text-secondary); font-size:0.9rem; margin-bottom: 15px;"></p>
 
-            <div class="station-photo-containere">
-                <span class="photo-placeholder" id="photo-placeholder">Recherche photo...</span>
+            <div class="station-photo-container">
+                <span class="photo-placeholder" id="photo-placeholder">
+                    <span>📷</span>
+                    <span>Recherche photo...</span>
+                </span>
                 <img id="st-photo" src="" alt="Photo de la gare">
             </div>
 
             <h3>Évolution Fréquentation</h3>
-            <div class="chart-wrapper"><canvas id="evolutionChart"></canvas></div>
+            <div class="card">
+                <div class="chart-wrapper"><canvas id="evolutionChart"></canvas></div>
+            </div>
         </div>
     </div>
 
