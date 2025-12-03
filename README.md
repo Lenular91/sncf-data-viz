@@ -9,6 +9,7 @@
 - [Vue d'ensemble](#-vue-densemble)
 - [Fonctionnalités](#-fonctionnalités)
 - [Technologies utilisées](#-technologies-utilisées)
+- [Améliorations récentes](#-améliorations-récentes)
 - [Installation](#-installation)
 - [Résolution des problèmes](#-résolution-des-problèmes-cors)
 - [Pipeline de données](#-pipeline-de-données)
@@ -35,18 +36,38 @@ L'application propose deux modes de fonctionnement :
 Visualisation géographique des gares avec regroupement automatique (clustering) via Leaflet
 
 ### 📊 Tableau de Bord Dynamique
-- Statistiques globales en temps réel
-- Nombre total de gares
-- Top 5 des gares par trafic
-- Répartition géographique par région (graphique circulaire)
+- **Statistiques globales** en temps réel
+  - Nombre total de gares affichées
+  - Mise à jour dynamique selon les filtres appliqués
+- **Répartition géographique** par région (graphique circulaire interactif)
+- **🏆 Top Trafic** 
+  - Filtrage par année (toutes les années disponibles : 2015-2023)
+  - Choix du nombre de gares à afficher (1 à 10)
+  - Tri par ordre décroissant (plus fort trafic en premier)
+- **📉 Top des Pires Trafics**
+  - Filtrage par année (toutes les années disponibles : 2015-2023)
+  - Choix du nombre de gares à afficher (1 à 10)
+  - Tri par ordre croissant (plus faible trafic en premier)
+  - Exclusion des gares sans trafic
 
 ### 📈 Détails par Gare
-Graphique d'évolution temporelle du trafic (2015-2023) accessible en un clic
+- Graphique d'évolution temporelle du trafic (2015-2023) accessible en un clic
+- Photo de la gare récupérée automatiquement depuis Wikidata
+- Informations géographiques (département, région)
 
-### 🔍 Recherche Intelligente
-Barre de recherche avec autocomplétion et zoom automatique sur la gare sélectionnée
+### 🔍 Filtres et Recherche
+- **Barre de recherche** avec filtrage en temps réel
+- **Filtre par région** avec liste déroulante dynamique
+- Zoom automatique sur la gare sélectionnée
+- Mise à jour automatique de tous les graphiques
 
-### 🔄 Basculement Instantané
+### 🎨 Interface Moderne
+- **Mode sombre/clair** avec basculement instantané
+- Design responsive et moderne
+- Animations fluides et micro-interactions
+- Thème persistant (sauvegardé dans le navigateur)
+
+### 🔄 Basculement de Source de Données
 Bouton de switch pour alterner entre mode JSON et SPARQL Live sans recharger la page
 
 ---
@@ -64,6 +85,38 @@ Bouton de switch pour alterner entre mode JSON et SPARQL Live sans recharger la 
   - `Leaflet.js` - Cartographie interactive
   - `Chart.js` - Visualisations graphiques
   - `Leaflet.markercluster` - Gestion optimisée des marqueurs
+
+---
+
+## 🆕 Améliorations Récentes
+
+### Version 2.0 - Décembre 2024
+
+#### 🎨 Interface Modernisée
+- **Mode Sombre/Clair** : Basculement instantané avec persistance du choix
+- **Design Premium** : Palette de couleurs harmonieuse, animations fluides
+- **Responsive** : Interface adaptée à tous les écrans
+
+#### 🔍 Filtres Avancés
+- **Filtre par Région** : Sélection dynamique parmi toutes les régions
+- **Recherche en Temps Réel** : Filtrage instantané des gares
+- **Mise à Jour Automatique** : Tous les graphiques se synchronisent
+
+#### 📊 Analyses Enrichies
+- **Top Trafic Configurable**
+  - Sélection de l'année (2015-2023)
+  - Choix du nombre de gares (1-10)
+  - Tri dynamique par trafic décroissant
+  
+- **Top des Pires Trafics**
+  - Même système de filtres que le Top Trafic
+  - Identification des gares à faible fréquentation
+  - Exclusion automatique des gares sans données
+
+#### 🖼️ Enrichissement Visuel
+- **Photos des Gares** : Récupération automatique depuis Wikidata
+- **Graphiques Thématiques** : Adaptation automatique au thème choisi
+- **Interactions Améliorées** : Survol, clics, animations
 
 ---
 
@@ -198,10 +251,25 @@ Les données sont enrichies via des requêtes SPARQL `INSERT` et `CONSTRUCT`
 ## 📁 Structure du Projet
 
 ```
-SNCF-Analytics/
-├── 📄 index.html          # Application principale
+sncf-data-viz/
+├── 📄 index.html          # Structure HTML de l'application
+├── 🎨 style.css           # Styles CSS (thème clair/sombre)
+├── ⚙️ script.js           # Logique JavaScript (carte, graphiques, filtres)
 ├── 📊 gares.json          # Données statiques (mode autonome)
 ├── 📂 data/
 │   └── gares.ttl          # Données RDF pour GraphDB
-└── 📄 README.md           # Ce fichier
+└── 📄 README.md           # Documentation du projet
 ```
+
+### Description des fichiers
+
+- **`index.html`** : Structure de la page avec la sidebar, la carte et les panneaux
+- **`style.css`** : Styles personnalisés avec variables CSS pour le thème clair/sombre
+- **`script.js`** : Fonctions principales
+  - Gestion de la carte Leaflet
+  - Requêtes SPARQL et chargement JSON
+  - Rendu des graphiques Chart.js
+  - Filtres et recherche
+  - Gestion du thème
+- **`gares.json`** : Export JSON des données pour le mode autonome
+- **`data/gares.ttl`** : Données RDF enrichies pour GraphDB
