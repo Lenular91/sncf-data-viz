@@ -1,0 +1,221 @@
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Roboto', sans-serif;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    background-color: #ecf0f1;
+}
+
+#sidebar {
+    width: 350px;
+    flex-shrink: 0;
+    background: white;
+    padding: 20px;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    z-index: 1000;
+}
+
+#map-container {
+    flex: 1;
+    position: relative;
+}
+
+#map {
+    height: 100%;
+    width: 100%;
+}
+
+h1 {
+    color: #2c3e50;
+    font-size: 1.4rem;
+    margin-top: 0;
+    border-bottom: 2px solid #0088ce;
+    padding-bottom: 10px;
+}
+
+h2 {
+    color: #0088ce;
+    font-size: 1.1rem;
+    margin-top: 20px;
+}
+
+h3 {
+    font-size: 0.9rem;
+    color: #7f8c8d;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+}
+
+.search-box {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 20px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+.card {
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 15px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.stat-big {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.stat-desc {
+    font-size: 0.8rem;
+    color: #7f8c8d;
+}
+
+.top-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.top-list li {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.top-list li:hover {
+    color: #0088ce;
+}
+
+.top-list span.count {
+    font-weight: bold;
+    color: #555;
+}
+
+.chart-wrapper {
+    position: relative;
+    height: 200px;
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+#loader {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #0088ce;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 20px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    z-index: 2000;
+    font-weight: bold;
+    display: none;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
+#details-panel {
+    display: none;
+    border-top: 2px dashed #ddd;
+    margin-top: 20px;
+    padding-top: 10px;
+}
+
+.close-btn {
+    float: right;
+    cursor: pointer;
+    color: red;
+    font-weight: bold;
+}
+
+/* --- STYLE DU BOUTON SWITCH --- */
+.mode-container {
+    background: #eee;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.mode-label {
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: #555;
+}
+
+.switch-btn {
+    padding: 5px 15px;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.8rem;
+    transition: all 0.3s;
+}
+
+.btn-json {
+    background-color: #95a5a6;
+    color: white;
+}
+
+.btn-live {
+    background-color: #27ae60;
+    color: white;
+    box-shadow: 0 0 8px #27ae60;
+}
+
+/* --- STYLE IMAGE GARE --- */
+.station-photo-container {
+    width: 100%;
+    height: 180px;
+    background-color: #ddd;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#st-photo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: none;
+}
+
+.photo-placeholder {
+    color: #888;
+    font-size: 0.8rem;
+}
