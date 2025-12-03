@@ -70,6 +70,27 @@
                 </div>
                 <ul class="top-list" id="top-stations-list"></ul>
             </div>
+
+            <h3>📉 Top des Pires Trafics</h3>
+            <div class="card" style="padding: 10px;">
+                <div class="top-controls">
+                    <select id="bottomYearFilter" class="filter-select" onchange="renderBottom5()">
+                    </select>
+                    <select id="bottomCountFilter" class="filter-select" onchange="renderBottom5()">
+                        <option value="1">Top 1</option>
+                        <option value="2">Top 2</option>
+                        <option value="3">Top 3</option>
+                        <option value="4">Top 4</option>
+                        <option value="5">Top 5</option>
+                        <option value="6">Top 6</option>
+                        <option value="7">Top 7</option>
+                        <option value="8">Top 8</option>
+                        <option value="9">Top 9</option>
+                        <option value="10">Top 10</option>
+                    </select>
+                </div>
+                <ul class="top-list" id="bottom-stations-list"></ul>
+            </div>
         </div>
 
         <div id="details-panel">

@@ -113,10 +113,12 @@ async function loadDashboardData() {
 
         populateRegionFilter();
         populateYearFilter();
+        populateBottomYearFilter();
 
         renderMap();
         renderStats();
         renderTop5();
+        renderBottom5();
         updateStationCount();
 
     } catch (error) {
@@ -198,6 +200,24 @@ function populateYearFilter() {
     });
 }
 
+function populateBottomYearFilter() {
+    const years = new Set();
+    Object.values(processedData).forEach(s => {
+        Object.keys(s.history).forEach(year => years.add(year));
+    });
+
+    const select = document.getElementById('bottomYearFilter');
+    select.innerHTML = '';
+
+    const sortedYears = Array.from(years).sort().reverse();
+    sortedYears.forEach(year => {
+        const opt = document.createElement('option');
+        opt.value = year;
+        opt.innerText = `📅 ${year}`;
+        select.appendChild(opt);
+    });
+}
+
 function getFilteredStations() {
     const searchInput = document.getElementById('search').value.toLowerCase();
     const regionInput = document.getElementById('regionFilter').value;
@@ -233,6 +253,7 @@ function filterStations() {
     updateStationCount(stations.length);
 
     renderTop5(stations);
+    renderBottom5(stations);
 }
 
 function renderStats() {
@@ -295,6 +316,38 @@ function renderTop5(stationsSource = null) {
         .slice(0, topCount);
 
     const list = document.getElementById('top-stations-list');
+    list.innerHTML = "";
+
+    if (sortedStations.length === 0) {
+        list.innerHTML = "<li style='justify-content:center; color:var(--text-secondary)'>Aucune gare trouvée</li>";
+        return;
+    }
+
+    sortedStations.forEach(s => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span>${s.nom}</span> <span class="count">${(s.history[selectedYear] || 0).toLocaleString()}</span>`;
+        li.onclick = () => {
+            map.setView([s.lat, s.long], 14);
+            displayDetails(s);
+        };
+        list.appendChild(li);
+    });
+}
+
+function renderBottom5(stationsSource = null) {
+    const source = stationsSource || Object.values(processedData);
+
+    const yearSelect = document.getElementById('bottomYearFilter');
+    const countSelect = document.getElementById('bottomCountFilter');
+    const selectedYear = yearSelect ? yearSelect.value : '2023';
+    const bottomCount = countSelect ? parseInt(countSelect.value) : 5;
+
+    const sortedStations = source
+        .filter(s => s.history[selectedYear] !== undefined && s.history[selectedYear] > 0)
+        .sort((a, b) => (a.history[selectedYear] || 0) - (b.history[selectedYear] || 0))
+        .slice(0, bottomCount);
+
+    const list = document.getElementById('bottom-stations-list');
     list.innerHTML = "";
 
     if (sortedStations.length === 0) {
